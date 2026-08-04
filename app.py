@@ -1,6 +1,8 @@
 import os
+from datetime import date, datetime
 
 from flask import Flask, flash, redirect, render_template, request, url_for
+from sqlalchemy import inspect, text
 
 from config import Config
 from models import Category, Expense, db
@@ -15,6 +17,14 @@ db.init_app(app)
 
 with app.app_context():
     db.create_all()
+
+    inspector = inspect(db.engine)
+    columns = [col["name"] for col in inspector.get_columns("expense")]
+    if "expense_date" not in columns:
+        db.session.execute(text("ALTER TABLE expense ADD COLUMN expense_date DATE"))
+        db.session.execute(text("UPDATE expense SET expense_date = date(date_added) WHERE expense_date IS NULL"))
+        db.session.commit()
+
     if not Category.query.filter_by(name="Other").first():
         db.session.add(Category(name="Other"))
         db.session.commit()
@@ -22,10 +32,10 @@ with app.app_context():
 
 @app.route("/")
 def index():
-    expenses = Expense.query.order_by(Expense.date_added.desc()).all()
+    expenses = Expense.query.order_by(Expense.expense_date.desc(), Expense.date_added.desc()).all()
     categories = Category.query.order_by(Category.name).all()
     total = sum(e.amount for e in expenses)
-    return render_template("index.html", expenses=expenses, categories=categories, total=total)
+    return render_template("index.html", expenses=expenses, categories=categories, total=total, today=date.today())
 
 
 @app.route("/add", methods=["POST"])
@@ -33,14 +43,26 @@ def add_expense():
     category = request.form.get("category", "").strip()
     description = request.form.get("description", "").strip()
     amount_raw = request.form.get("amount", "")
+    expense_date_raw = request.form.get("expense_date", "")
 
     try:
         amount = float(amount_raw)
     except ValueError:
         amount = None
 
-    if category and category != NEW_CATEGORY_SENTINEL and amount is not None and amount > 0:
-        expense = Expense(amount=amount, category=category, description=description or None)
+    try:
+        expense_date = datetime.strptime(expense_date_raw, "%Y-%m-%d").date()
+    except ValueError:
+        expense_date = None
+
+    if (
+        category
+        and category != NEW_CATEGORY_SENTINEL
+        and amount is not None
+        and amount > 0
+        and expense_date is not None
+    ):
+        expense = Expense(amount=amount, category=category, description=description or None, expense_date=expense_date)
         db.session.add(expense)
         db.session.commit()
 
