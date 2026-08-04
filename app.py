@@ -46,7 +46,13 @@ def index():
     )
     category_totals = sorted(
         (
-            {"id": c.id, "name": c.name, "emoji": c.emoji, "total": category_sums.get(c.name, 0.0)}
+            {
+                "id": c.id,
+                "name": c.name,
+                "emoji": c.emoji,
+                "total": category_sums.get(c.name, 0.0),
+                "deletable": c.name not in category_sums,
+            }
             for c in categories
         ),
         key=lambda c: c["total"],
@@ -126,6 +132,20 @@ def update_category_emoji(category_id):
         emoji = request.form.get("emoji", "").strip()
         if len(emoji) <= 8:
             category.emoji = emoji or None
+            db.session.commit()
+
+    return redirect(url_for("index"))
+
+
+@app.route("/categories/<int:category_id>/delete", methods=["POST"])
+def delete_category(category_id):
+    category = db.session.get(Category, category_id)
+    if category:
+        has_expenses = Expense.query.filter_by(category=category.name).first() is not None
+        if has_expenses:
+            flash("Cannot delete a category that has expenses.", "category_delete")
+        else:
+            db.session.delete(category)
             db.session.commit()
 
     return redirect(url_for("index"))
