@@ -2,7 +2,7 @@ import os
 from datetime import date, datetime
 
 from flask import Flask, flash, redirect, render_template, request, url_for
-from sqlalchemy import inspect, text
+from sqlalchemy import func, inspect, text
 
 from config import Config
 from models import Category, Expense, db
@@ -35,7 +35,24 @@ def index():
     expenses = Expense.query.order_by(Expense.expense_date.desc(), Expense.date_added.desc()).all()
     categories = Category.query.order_by(Category.name).all()
     total = sum(e.amount for e in expenses)
-    return render_template("index.html", expenses=expenses, categories=categories, total=total, today=date.today())
+
+    category_sums = dict(
+        db.session.query(Expense.category, func.sum(Expense.amount)).group_by(Expense.category).all()
+    )
+    category_totals = sorted(
+        ({"name": c.name, "total": category_sums.get(c.name, 0.0)} for c in categories),
+        key=lambda c: c["total"],
+        reverse=True,
+    )
+
+    return render_template(
+        "index.html",
+        expenses=expenses,
+        categories=categories,
+        category_totals=category_totals,
+        total=total,
+        today=date.today(),
+    )
 
 
 @app.route("/add", methods=["POST"])
