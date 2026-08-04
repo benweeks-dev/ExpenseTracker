@@ -52,12 +52,14 @@ def index():
         key=lambda c: c["total"],
         reverse=True,
     )
+    category_emojis = {c.name: c.emoji for c in categories}
 
     return render_template(
         "index.html",
         expenses=expenses,
         categories=categories,
         category_totals=category_totals,
+        category_emojis=category_emojis,
         total=total,
         today=date.today(),
     )
@@ -125,6 +127,43 @@ def update_category_emoji(category_id):
         if len(emoji) <= 8:
             category.emoji = emoji or None
             db.session.commit()
+
+    return redirect(url_for("index"))
+
+
+@app.route("/expenses/<int:expense_id>/edit", methods=["POST"])
+def edit_expense(expense_id):
+    expense = db.session.get(Expense, expense_id)
+    if not expense:
+        return redirect(url_for("index"))
+
+    category = request.form.get("category", "").strip()
+    description = request.form.get("description", "").strip()
+    amount_raw = request.form.get("amount", "")
+    expense_date_raw = request.form.get("expense_date", "")
+
+    try:
+        amount = float(amount_raw)
+    except ValueError:
+        amount = None
+
+    try:
+        expense_date = datetime.strptime(expense_date_raw, "%Y-%m-%d").date()
+    except ValueError:
+        expense_date = None
+
+    if (
+        category
+        and category != NEW_CATEGORY_SENTINEL
+        and amount is not None
+        and amount > 0
+        and expense_date is not None
+    ):
+        expense.amount = amount
+        expense.category = category
+        expense.description = description or None
+        expense.expense_date = expense_date
+        db.session.commit()
 
     return redirect(url_for("index"))
 
