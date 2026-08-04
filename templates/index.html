@@ -38,6 +38,7 @@
                 <th>Category</th>
                 <th>Description</th>
                 <th class="text-end">Amount</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -47,10 +48,15 @@
                 <td>{{ e.category }}</td>
                 <td>{{ e.description or "" }}</td>
                 <td class="text-end">${{ "%.2f"|format(e.amount) }}</td>
+                <td class="text-end">
+                    <form method="POST" action="{{ url_for('delete_expense', expense_id=e.id) }}" onsubmit="return confirm('Permanently delete this expense?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="4" class="text-center text-muted">No expenses yet</td>
+                <td colspan="5" class="text-center text-muted">No expenses yet</td>
             </tr>
             {% endfor %}
         </tbody>

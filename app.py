@@ -41,5 +41,15 @@ def add_expense():
     return redirect(url_for("index"))
 
 
+@app.route("/delete/<int:expense_id>", methods=["POST"])
+def delete_expense(expense_id):
+    expense = db.session.get(Expense, expense_id)
+    if expense:
+        db.session.delete(expense)
+        db.session.commit()
+
+    return redirect(url_for("index"))
+
+
 if __name__ == "__main__":
     app.run(debug=True)
