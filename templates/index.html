@@ -153,14 +153,17 @@
     </div>
 
     <div class="border rounded shadow-sm p-3 mb-4 panel">
-        <h2 class="h5 fw-bold text-uppercase mb-3">Category Totals</h2>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h5 fw-bold text-uppercase mb-0">Category Totals</h2>
+            <button type="button" id="clearCategorySelection" class="btn btn-outline-secondary btn-sm" disabled>Clear Selection</button>
+        </div>
         {% for message in category_delete_errors %}
         <div class="alert alert-danger">{{ message }}</div>
         {% endfor %}
         <div class="row g-2">
             {% for c in category_totals %}
             <div class="col-6 col-sm-4 col-md-3 col-lg-2">
-                <div class="border rounded shadow-sm p-3 text-center panel h-100 position-relative">
+                <div class="border rounded shadow-sm p-3 text-center panel h-100 position-relative category-card" data-category="{{ c.name }}">
                     {% if c.deletable %}
                     <form method="POST" action="{{ url_for('delete_category', category_id=c.id) }}" onsubmit="return confirm('Delete category {{ c.name }}?');" class="position-absolute top-0 end-0">
                         <button type="submit" class="btn delete-btn p-0" aria-label="Delete category {{ c.name }}">&times;</button>
@@ -188,7 +191,7 @@
     <div class="border rounded shadow-sm p-3 panel">
         <h2 class="h5 fw-bold text-uppercase mb-3">Expenses</h2>
         {% for e in expenses %}
-        <div class="d-flex justify-content-between align-items-center border rounded shadow-sm p-3 mb-2 panel">
+        <div class="d-flex justify-content-between align-items-center border rounded shadow-sm p-3 mb-2 panel expense-row" data-category="{{ e.category }}">
             <div class="d-flex align-items-center gap-3">
                 <div class="fs-3">{{ category_emojis.get(e.category) or '🏷️' }}</div>
                 <div>
@@ -217,6 +220,7 @@
         {% else %}
         <div class="text-center text-muted p-4">No expenses yet</div>
         {% endfor %}
+        <div id="noFilteredExpenses" class="text-center text-muted p-4 d-none">No expenses in the selected categories</div>
     </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -325,6 +329,48 @@
 
     editExpenseModalEl.addEventListener("shown.bs.modal", () => {
         editExpenseAmount.focus();
+    });
+
+    const selectedCategories = new Set();
+    const expenseRows = document.querySelectorAll(".expense-row");
+    const noFilteredExpenses = document.getElementById("noFilteredExpenses");
+    const categoryCards = document.querySelectorAll(".category-card");
+    const clearCategorySelection = document.getElementById("clearCategorySelection");
+
+    function filterExpenses() {
+        let visibleCount = 0;
+        expenseRows.forEach((row) => {
+            const show = selectedCategories.size === 0 || selectedCategories.has(row.dataset.category);
+            row.classList.toggle("d-none", !show);
+            if (show) visibleCount++;
+        });
+        noFilteredExpenses.classList.toggle("d-none", visibleCount !== 0 || expenseRows.length === 0);
+        const hasSelection = selectedCategories.size > 0;
+        clearCategorySelection.disabled = !hasSelection;
+        clearCategorySelection.classList.toggle("btn-secondary", hasSelection);
+        clearCategorySelection.classList.toggle("btn-outline-secondary", !hasSelection);
+    }
+
+    categoryCards.forEach((card) => {
+        card.addEventListener("click", (event) => {
+            if (event.target.closest(".edit-emoji-btn, form")) return;
+
+            const category = card.dataset.category;
+            if (selectedCategories.has(category)) {
+                selectedCategories.delete(category);
+                card.classList.remove("category-selected");
+            } else {
+                selectedCategories.add(category);
+                card.classList.add("category-selected");
+            }
+            filterExpenses();
+        });
+    });
+
+    clearCategorySelection.addEventListener("click", () => {
+        selectedCategories.clear();
+        categoryCards.forEach((card) => card.classList.remove("category-selected"));
+        filterExpenses();
     });
 </script>
 </body>
