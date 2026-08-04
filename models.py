@@ -20,6 +20,7 @@ class Expense(db.Model):
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(30), unique=True, nullable=False)
+    emoji = db.Column(db.String(8), nullable=True)
 
     def __repr__(self):
         return f"<Category {self.name}>"

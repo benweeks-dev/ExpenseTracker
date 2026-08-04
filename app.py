@@ -26,6 +26,11 @@ with app.app_context():
         db.session.execute(text("UPDATE expense SET expense_date = date(date_added) WHERE expense_date IS NULL"))
         db.session.commit()
 
+    category_columns = [col["name"] for col in inspector.get_columns("category")]
+    if "emoji" not in category_columns:
+        db.session.execute(text("ALTER TABLE category ADD COLUMN emoji VARCHAR(8)"))
+        db.session.commit()
+
     if not Category.query.filter_by(name="Other").first():
         db.session.add(Category(name="Other"))
         db.session.commit()
@@ -40,7 +45,10 @@ def index():
         db.session.query(Expense.category, func.sum(Expense.amount)).group_by(Expense.category).all()
     )
     category_totals = sorted(
-        ({"name": c.name, "total": category_sums.get(c.name, 0.0)} for c in categories),
+        (
+            {"id": c.id, "name": c.name, "emoji": c.emoji, "total": category_sums.get(c.name, 0.0)}
+            for c in categories
+        ),
         key=lambda c: c["total"],
         reverse=True,
     )
@@ -89,19 +97,34 @@ def add_expense():
 @app.route("/categories/add", methods=["POST"])
 def add_category():
     raw = request.form.get("name", "").strip()
+    emoji = request.form.get("emoji", "").strip()
 
     if not raw:
         flash("Category name is required.")
     elif len(raw) > 30:
         flash("Category name must be 30 characters or fewer.")
+    elif len(emoji) > 8:
+        flash("Emoji must be 8 characters or fewer.")
     else:
         formatted = " ".join(w.capitalize() for w in raw.split())
         if Category.query.filter_by(name=formatted).first():
             flash("Category already exists.")
         else:
-            db.session.add(Category(name=formatted))
+            db.session.add(Category(name=formatted, emoji=emoji or None))
             db.session.commit()
             return redirect(url_for("index", new=formatted))
+
+    return redirect(url_for("index"))
+
+
+@app.route("/categories/<int:category_id>/emoji", methods=["POST"])
+def update_category_emoji(category_id):
+    category = db.session.get(Category, category_id)
+    if category:
+        emoji = request.form.get("emoji", "").strip()
+        if len(emoji) <= 8:
+            category.emoji = emoji or None
+            db.session.commit()
 
     return redirect(url_for("index"))
 

@@ -11,7 +11,7 @@
     {% set category_errors = get_flashed_messages() %}
 
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 border rounded shadow-sm p-3 panel">
-        <h1 class="mb-0">Expense Tracker</h1>
+        <h1 class="mb-0"><u>Expense Tracker</u></h1>
         <div class="d-flex align-items-center gap-3">
             <div class="alert alert-primary fs-4 mb-0">Total: ${{ "%.2f"|format(total) }}</div>
             <button type="button" id="theme-toggle" class="btn btn-outline-secondary" aria-label="Toggle dark mode">🌙</button>
@@ -23,11 +23,11 @@
         <form method="POST" action="{{ url_for('add_expense') }}">
             <div class="row g-2 mb-2">
                 <div class="col-sm-4">
-                    <label class="form-label">Amount</label>
+                    <label class="form-label text-uppercase">Amount</label>
                     <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required>
                 </div>
                 <div class="col-sm-4">
-                    <label class="form-label">Category</label>
+                    <label class="form-label text-uppercase">Category</label>
                     <select name="category" id="category-select" class="form-select" required>
                         <option value="" disabled {% if not request.args.get('new') %}selected{% endif %}>Select...</option>
                         {% for c in categories %}
@@ -37,13 +37,13 @@
                     </select>
                 </div>
                 <div class="col-sm-4">
-                    <label class="form-label">Date</label>
+                    <label class="form-label text-uppercase">Date</label>
                     <input type="date" name="expense_date" class="form-control" value="{{ today.isoformat() }}" required>
                 </div>
             </div>
             <div class="row g-2">
                 <div class="col-sm-9">
-                    <label class="form-label">Description (optional)</label>
+                    <label class="form-label text-uppercase">Description (optional)</label>
                     <input type="text" name="description" class="form-control">
                 </div>
                 <div class="col-sm-3 d-flex align-items-end">
@@ -65,12 +65,45 @@
                         {% for message in category_errors %}
                         <div class="alert alert-danger">{{ message }}</div>
                         {% endfor %}
-                        <label class="form-label">Category name</label>
-                        <input type="text" name="name" maxlength="30" class="form-control" placeholder="e.g. Office Supplies" autocomplete="off">
+                        <div class="d-flex gap-2">
+                            <div style="width: 4.5rem;">
+                                <label class="form-label">Emoji</label>
+                                <button type="button" id="addEmojiPreview" class="btn btn-outline-secondary w-100 fs-4" aria-label="Choose emoji">🏷️</button>
+                                <input type="hidden" name="emoji" id="addEmojiInput">
+                            </div>
+                            <div class="flex-grow-1">
+                                <label class="form-label">Category name</label>
+                                <input type="text" name="name" maxlength="30" class="form-control" placeholder="e.g. Office Supplies" autocomplete="off">
+                            </div>
+                        </div>
+                        <emoji-picker id="addEmojiPicker" class="d-none mt-2" style="width: 100%; max-width: 100%;"></emoji-picker>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Add Category</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="editEmojiModal" tabindex="-1" aria-labelledby="editEmojiModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" id="editEmojiForm" action="">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editEmojiModalLabel">Edit Emoji</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label">Emoji</label>
+                        <button type="button" id="editEmojiPreview" class="btn btn-outline-secondary fs-4" style="width: 3.5rem;" aria-label="Choose emoji">🏷️</button>
+                        <input type="hidden" name="emoji" id="editEmojiInput">
+                        <emoji-picker id="editEmojiPicker" class="d-none mt-2" style="width: 100%; max-width: 100%;"></emoji-picker>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
                     </div>
                 </form>
             </div>
@@ -83,6 +116,13 @@
             {% for c in category_totals %}
             <div class="col-6 col-sm-4 col-md-3 col-lg-2">
                 <div class="border rounded shadow-sm p-3 text-center panel h-100">
+                    <button
+                        type="button"
+                        class="btn p-0 border-0 fs-3 edit-emoji-btn"
+                        data-edit-url="{{ url_for('update_category_emoji', category_id=c.id) }}"
+                        data-current-emoji="{{ c.emoji or '' }}"
+                        aria-label="Edit emoji for {{ c.name }}"
+                    >{{ c.emoji or '🏷️' }}</button>
                     <div class="fw-semibold text-truncate">{{ c.name }}</div>
                     <div class="fs-5">${{ "%.2f"|format(c.total) }}</div>
                 </div>
@@ -117,6 +157,7 @@
     </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
 <script>
     const categorySelect = document.getElementById("category-select");
     const addCategoryModalEl = document.getElementById("addCategoryModal");
@@ -145,6 +186,10 @@
     function applyTheme(theme) {
         document.documentElement.setAttribute("data-bs-theme", theme);
         themeToggle.textContent = theme === "dark" ? "☀️" : "🌙";
+        document.querySelectorAll("emoji-picker").forEach((picker) => {
+            picker.classList.remove("light", "dark");
+            picker.classList.add(theme);
+        });
     }
 
     applyTheme(localStorage.getItem("theme") || "light");
@@ -154,6 +199,47 @@
         localStorage.setItem("theme", newTheme);
         applyTheme(newTheme);
     });
+
+    const editEmojiModalEl = document.getElementById("editEmojiModal");
+    const editEmojiModal = new bootstrap.Modal(editEmojiModalEl);
+    const editEmojiForm = document.getElementById("editEmojiForm");
+    const editEmojiInput = document.getElementById("editEmojiInput");
+    const editEmojiPreview = document.getElementById("editEmojiPreview");
+    const editEmojiPicker = document.getElementById("editEmojiPicker");
+
+    document.querySelectorAll(".edit-emoji-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            editEmojiForm.action = btn.dataset.editUrl;
+            editEmojiInput.value = btn.dataset.currentEmoji;
+            editEmojiPreview.textContent = btn.dataset.currentEmoji || "🏷️";
+            editEmojiPicker.classList.add("d-none");
+            editEmojiModal.show();
+        });
+    });
+
+    editEmojiModalEl.addEventListener("shown.bs.modal", () => {
+        editEmojiPreview.focus();
+    });
+
+    function wireEmojiPicker(previewBtn, hiddenInput, picker) {
+        previewBtn.addEventListener("click", () => {
+            picker.classList.toggle("d-none");
+        });
+        picker.addEventListener("emoji-click", (event) => {
+            const emoji = event.detail.unicode;
+            hiddenInput.value = emoji;
+            previewBtn.textContent = emoji;
+            picker.classList.add("d-none");
+        });
+    }
+
+    wireEmojiPicker(
+        document.getElementById("addEmojiPreview"),
+        document.getElementById("addEmojiInput"),
+        document.getElementById("addEmojiPicker")
+    );
+
+    wireEmojiPicker(editEmojiPreview, editEmojiInput, editEmojiPicker);
 </script>
 </body>
 </html>
