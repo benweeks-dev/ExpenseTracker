@@ -3,7 +3,10 @@
 }
 .panel:hover {
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    background-color: rgba(13, 110, 253, 0.03);
+    background-color: rgba(13, 110, 253, 0.08);
+}
+[data-bs-theme="dark"] .panel:hover {
+    background-color: rgba(255, 255, 255, 0.08);
 }
 .delete-btn {
     display: inline-flex;
