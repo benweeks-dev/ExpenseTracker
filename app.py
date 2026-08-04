@@ -18,6 +18,7 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
+    ''' Used for Adding a column to existing table: '''
     inspector = inspect(db.engine)
     columns = [col["name"] for col in inspector.get_columns("expense")]
     if "expense_date" not in columns:
@@ -28,7 +29,6 @@ with app.app_context():
     if not Category.query.filter_by(name="Other").first():
         db.session.add(Category(name="Other"))
         db.session.commit()
-
 
 @app.route("/")
 def index():
