@@ -189,10 +189,33 @@
     </div>
 
     <div class="border rounded shadow-sm p-3 panel">
-        <h2 class="h5 fw-bold text-uppercase mb-3">Expenses</h2>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h5 fw-bold text-uppercase mb-0">Expenses</h2>
+            <button type="button" id="clearExpenseFilters" class="btn btn-outline-secondary btn-sm" disabled>Clear Filters</button>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-6 col-sm-3">
+                <label class="form-label text-uppercase small">Month</label>
+                <select id="monthFilter" class="form-select form-select-sm">
+                    <option value="">All Months</option>
+                </select>
+            </div>
+            <div class="col-6 col-sm-3">
+                <label class="form-label text-uppercase small">From</label>
+                <input type="date" id="dateFromFilter" class="form-control form-control-sm">
+            </div>
+            <div class="col-6 col-sm-3">
+                <label class="form-label text-uppercase small">To</label>
+                <input type="date" id="dateToFilter" class="form-control form-control-sm">
+            </div>
+            <div class="col-6 col-sm-3">
+                <label class="form-label text-uppercase small">Min Amount ($)</label>
+                <input type="number" step="0.01" min="0" id="minAmountFilter" class="form-control form-control-sm" placeholder="0.00">
+            </div>
+        </div>
         <div class="expenses-scroll">
         {% for e in expenses %}
-        <div class="d-flex justify-content-between align-items-center border rounded shadow-sm p-3 mb-2 panel expense-row" data-category="{{ e.category }}">
+        <div class="d-flex justify-content-between align-items-center border rounded shadow-sm p-3 mb-2 panel expense-row" data-category="{{ e.category }}" data-date="{{ e.expense_date.isoformat() }}" data-amount="{{ e.amount }}">
             <div class="d-flex align-items-center gap-3">
                 <div class="fs-3">{{ category_emojis.get(e.category) or '🏷️' }}</div>
                 <div>
@@ -221,7 +244,7 @@
         {% else %}
         <div class="text-center text-muted p-4">No expenses yet</div>
         {% endfor %}
-        <div id="noFilteredExpenses" class="text-center text-muted p-4 d-none">No expenses in the selected categories</div>
+        <div id="noFilteredExpenses" class="text-center text-muted p-4 d-none">No expenses match the selected filters</div>
         </div>
     </div>
 </div>
@@ -338,19 +361,58 @@
     const noFilteredExpenses = document.getElementById("noFilteredExpenses");
     const categoryCards = document.querySelectorAll(".category-card");
     const clearCategorySelection = document.getElementById("clearCategorySelection");
+    const monthFilter = document.getElementById("monthFilter");
+    const dateFromFilter = document.getElementById("dateFromFilter");
+    const dateToFilter = document.getElementById("dateToFilter");
+    const minAmountFilter = document.getElementById("minAmountFilter");
+    const clearExpenseFilters = document.getElementById("clearExpenseFilters");
+
+    const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    const months = new Set();
+    expenseRows.forEach((row) => months.add(row.dataset.date.slice(0, 7)));
+    Array.from(months).sort().reverse().forEach((month) => {
+        const [year, monthNum] = month.split("-");
+        const option = document.createElement("option");
+        option.value = month;
+        option.textContent = `${MONTH_NAMES[parseInt(monthNum, 10) - 1]} ${year}`;
+        monthFilter.appendChild(option);
+    });
 
     function filterExpenses() {
+        const month = monthFilter.value;
+        const dateFrom = dateFromFilter.value;
+        const dateTo = dateToFilter.value;
+        const minAmount = parseFloat(minAmountFilter.value);
+
         let visibleCount = 0;
         expenseRows.forEach((row) => {
-            const show = selectedCategories.size === 0 || selectedCategories.has(row.dataset.category);
+            const categoryMatch = selectedCategories.size === 0 || selectedCategories.has(row.dataset.category);
+
+            let dateMatch = true;
+            if (month) {
+                dateMatch = row.dataset.date.startsWith(month);
+            } else if (dateFrom || dateTo) {
+                dateMatch = (!dateFrom || row.dataset.date >= dateFrom) && (!dateTo || row.dataset.date <= dateTo);
+            }
+
+            const amountMatch = isNaN(minAmount) || parseFloat(row.dataset.amount) >= minAmount;
+
+            const show = categoryMatch && dateMatch && amountMatch;
             row.classList.toggle("d-none", !show);
             if (show) visibleCount++;
         });
         noFilteredExpenses.classList.toggle("d-none", visibleCount !== 0 || expenseRows.length === 0);
+
         const hasSelection = selectedCategories.size > 0;
         clearCategorySelection.disabled = !hasSelection;
         clearCategorySelection.classList.toggle("btn-secondary", hasSelection);
         clearCategorySelection.classList.toggle("btn-outline-secondary", !hasSelection);
+
+        const hasExpenseFilters = Boolean(month || dateFrom || dateTo || minAmountFilter.value);
+        clearExpenseFilters.disabled = !hasExpenseFilters;
+        clearExpenseFilters.classList.toggle("btn-secondary", hasExpenseFilters);
+        clearExpenseFilters.classList.toggle("btn-outline-secondary", !hasExpenseFilters);
     }
 
     categoryCards.forEach((card) => {
@@ -372,6 +434,31 @@
     clearCategorySelection.addEventListener("click", () => {
         selectedCategories.clear();
         categoryCards.forEach((card) => card.classList.remove("category-selected"));
+        filterExpenses();
+    });
+
+    monthFilter.addEventListener("change", () => {
+        if (monthFilter.value) {
+            dateFromFilter.value = "";
+            dateToFilter.value = "";
+        }
+        filterExpenses();
+    });
+
+    [dateFromFilter, dateToFilter].forEach((input) => {
+        input.addEventListener("input", () => {
+            monthFilter.value = "";
+            filterExpenses();
+        });
+    });
+
+    minAmountFilter.addEventListener("input", filterExpenses);
+
+    clearExpenseFilters.addEventListener("click", () => {
+        monthFilter.value = "";
+        dateFromFilter.value = "";
+        dateToFilter.value = "";
+        minAmountFilter.value = "";
         filterExpenses();
     });
 </script>
