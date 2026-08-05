@@ -188,6 +188,25 @@
         </div>
     </div>
 
+    <div class="border rounded shadow-sm p-3 mb-4 panel">
+        <h2 class="h5 fw-bold text-uppercase mb-3">Spending Overview</h2>
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <canvas id="categoryBarChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <canvas id="categoryPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="chart-container">
+            <canvas id="spendingOverTimeChart"></canvas>
+        </div>
+    </div>
+
     <div class="border rounded shadow-sm p-3 panel">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2 class="h5 fw-bold text-uppercase mb-0">Expenses</h2>
@@ -250,6 +269,8 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script>
     const categorySelect = document.getElementById("category-select");
     const addCategoryModalEl = document.getElementById("addCategoryModal");
@@ -282,9 +303,8 @@
             picker.classList.remove("light", "dark");
             picker.classList.add(theme);
         });
+        refreshChartsTheme();
     }
-
-    applyTheme(localStorage.getItem("theme") || "light");
 
     themeToggle.addEventListener("click", () => {
         const newTheme = document.documentElement.getAttribute("data-bs-theme") === "dark" ? "light" : "dark";
@@ -413,6 +433,8 @@
         clearExpenseFilters.disabled = !hasExpenseFilters;
         clearExpenseFilters.classList.toggle("btn-secondary", hasExpenseFilters);
         clearExpenseFilters.classList.toggle("btn-outline-secondary", !hasExpenseFilters);
+
+        updateCharts();
     }
 
     categoryCards.forEach((card) => {
@@ -461,6 +483,176 @@
         minAmountFilter.value = "";
         filterExpenses();
     });
+
+    const CATEGORICAL_LIGHT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
+    const CATEGORICAL_DARK = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
+    const OTHER_LABEL = "Other";
+    const OTHER_COLOR_LIGHT = "#898781";
+    const OTHER_COLOR_DARK = "#a3a299";
+
+    const CHART_THEME = {
+        light: { grid: "#e1e0d9", tick: "#898781", text: "#52514e" },
+        dark: { grid: "#2c2c2a", tick: "#898781", text: "#c3c2b7" },
+    };
+
+    function isDarkMode() {
+        return document.documentElement.getAttribute("data-bs-theme") === "dark";
+    }
+
+    // Color follows the category (entity), not its rank in the current filter,
+    // so slots are assigned once from stable, server-rendered card order.
+    const categoryColorSlots = new Map();
+    categoryCards.forEach((card, index) => {
+        categoryColorSlots.set(card.dataset.category, index < CATEGORICAL_LIGHT.length ? index : -1);
+    });
+
+    function getCategoryColor(name) {
+        const palette = isDarkMode() ? CATEGORICAL_DARK : CATEGORICAL_LIGHT;
+        const slot = categoryColorSlots.has(name) ? categoryColorSlots.get(name) : -1;
+        if (slot >= 0) return palette[slot];
+        return isDarkMode() ? OTHER_COLOR_DARK : OTHER_COLOR_LIGHT;
+    }
+
+    function getSurfaceColor() {
+        return getComputedStyle(document.body).backgroundColor;
+    }
+
+    function currencyTick(value) {
+        return "$" + value;
+    }
+
+    const categoryBarChart = new Chart(document.getElementById("categoryBarChart"), {
+        type: "bar",
+        data: { labels: [], datasets: [{ data: [], backgroundColor: [], maxBarThickness: 24, borderRadius: 4 }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: "Expenses by Category" },
+                tooltip: { callbacks: { label: (ctx) => " $" + ctx.parsed.y.toFixed(2) } },
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: { beginAtZero: true, ticks: { callback: currencyTick } },
+            },
+        },
+    });
+
+    const categoryPieChart = new Chart(document.getElementById("categoryPieChart"), {
+        type: "doughnut",
+        data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 2 }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, position: "bottom" },
+                title: { display: true, text: "Share by Category" },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const total = ctx.dataset.data.reduce((sum, value) => sum + value, 0);
+                            const pct = total ? ((ctx.parsed / total) * 100).toFixed(1) : "0.0";
+                            return ` ${ctx.label}: $${ctx.parsed.toFixed(2)} (${pct}%)`;
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    const spendingOverTimeChart = new Chart(document.getElementById("spendingOverTimeChart"), {
+        type: "line",
+        data: {
+            datasets: [{
+                data: [],
+                borderColor: CATEGORICAL_LIGHT[0],
+                backgroundColor: "rgba(42, 120, 214, 0.1)",
+                fill: true,
+                tension: 0.0,
+                borderWidth: 2,
+                pointRadius: 3,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: "Spending Over Time" },
+                tooltip: { callbacks: { label: (ctx) => " $" + ctx.parsed.y.toFixed(2) } },
+            },
+            scales: {
+                x: { type: "time", time: { tooltipFormat: "MMM dd, yyyy" }, grid: { display: true } },
+                y: { beginAtZero: true, ticks: { callback: currencyTick } },
+            },
+        },
+    });
+
+    function refreshChartsTheme() {
+        const theme = CHART_THEME[isDarkMode() ? "dark" : "light"];
+        const lineColor = isDarkMode() ? "#ffffff" : "#000000" ; //CATEGORICAL_DARK[0] : CATEGORICAL_LIGHT[0];
+
+        [categoryBarChart, spendingOverTimeChart].forEach((chart) => {
+            chart.options.scales.x.ticks = { ...chart.options.scales.x.ticks, color: theme.tick };
+            chart.options.scales.y.ticks = { ...chart.options.scales.y.ticks, color: theme.tick };
+            chart.options.scales.y.grid = { color: theme.grid };
+            chart.options.plugins.title.color = theme.text;
+        });
+        categoryBarChart.options.plugins.title.text = "Expenses by Category";
+        spendingOverTimeChart.data.datasets[0].borderColor = lineColor;
+        spendingOverTimeChart.data.datasets[0].backgroundColor = lineColor.startsWith("#")
+            ? lineColor + "1a"
+            : lineColor;
+
+        categoryPieChart.options.plugins.legend.labels = { color: theme.text };
+        categoryPieChart.options.plugins.title.color = theme.text;
+        categoryPieChart.data.datasets[0].borderColor = getSurfaceColor();
+
+        updateCharts();
+    }
+
+    function updateCharts() {
+        const categoryTotals = new Map();
+        const dateTotals = new Map();
+
+        expenseRows.forEach((row) => {
+            if (row.classList.contains("d-none")) return;
+            const category = row.dataset.category;
+            const amount = parseFloat(row.dataset.amount);
+            categoryTotals.set(category, (categoryTotals.get(category) || 0) + amount);
+            dateTotals.set(row.dataset.date, (dateTotals.get(row.dataset.date) || 0) + amount);
+        });
+
+        const sortedCategories = Array.from(categoryTotals.entries()).sort((a, b) => b[1] - a[1]);
+
+        categoryBarChart.data.labels = sortedCategories.map(([name]) => name);
+        categoryBarChart.data.datasets[0].data = sortedCategories.map(([, total]) => total);
+        categoryBarChart.data.datasets[0].backgroundColor = sortedCategories.map(([name]) => getCategoryColor(name));
+        categoryBarChart.update();
+
+        let pieEntries = sortedCategories.map(([name, total]) => ({ name, total }));
+        if (pieEntries.length > 6) {
+            const top = pieEntries.slice(0, 5);
+            const otherTotal = pieEntries.slice(5).reduce((sum, entry) => sum + entry.total, 0);
+            pieEntries = [...top, { name: OTHER_LABEL, total: otherTotal }];
+        }
+        categoryPieChart.data.labels = pieEntries.map((entry) => entry.name);
+        categoryPieChart.data.datasets[0].data = pieEntries.map((entry) => entry.total);
+        categoryPieChart.data.datasets[0].backgroundColor = pieEntries.map((entry) => getCategoryColor(entry.name));
+        categoryPieChart.data.datasets[0].borderColor = getSurfaceColor();
+        categoryPieChart.update();
+
+        const sortedDates = Array.from(dateTotals.keys()).sort();
+        spendingOverTimeChart.data.datasets[0].data = sortedDates.map((date) => ({
+            x: new Date(date + "T00:00:00"),
+            y: dateTotals.get(date),
+        }));
+        spendingOverTimeChart.update();
+    }
+
+    applyTheme(localStorage.getItem("theme") || "light");
+    filterExpenses();
 </script>
 </body>
 </html>

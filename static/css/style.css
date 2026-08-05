@@ -69,3 +69,7 @@
     overflow-y: auto;
     padding-right: 0.5rem;
 }
+.chart-container {
+    position: relative;
+    height: 300px;
+}
