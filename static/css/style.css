@@ -10,6 +10,18 @@
 }
 .category-card {
     cursor: pointer;
+    container-type: inline-size;
+}
+.category-card .edit-emoji-btn {
+    font-size: clamp(1rem, 22cqw, 1.75rem) !important;
+}
+.category-card .fw-semibold {
+    font-size: clamp(0.65rem, 13cqw, 1rem);
+}
+.category-card .fs-5 {
+    font-size: clamp(0.75rem, 13cqw, 1rem) !important;
+    white-space: nowrap;
+    overflow: hidden;
 }
 .category-card.category-selected {
     background-color: rgba(13, 110, 253, 0.12);
