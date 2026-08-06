@@ -78,6 +78,13 @@ def add_expense():
     amount_raw = request.form.get("amount", "")
     expense_date_raw = request.form.get("expense_date", "")
 
+    if len(category) > 30:
+        flash("Category must be 30 characters or fewer.", "expense_error")
+        return redirect(url_for("index"))
+    if len(description) > 255:
+        flash("Description must be 255 characters or fewer.", "expense_error")
+        return redirect(url_for("index"))
+
     try:
         amount = float(amount_raw)
     except ValueError:
@@ -108,15 +115,15 @@ def add_category():
     emoji = request.form.get("emoji", "").strip()
 
     if not raw:
-        flash("Category name is required.")
+        flash("Category name is required.", "category_error")
     elif len(raw) > 30:
-        flash("Category name must be 30 characters or fewer.")
+        flash("Category name must be 30 characters or fewer.", "category_error")
     elif len(emoji) > 8:
-        flash("Emoji must be 8 characters or fewer.")
+        flash("Emoji must be 8 characters or fewer.", "category_error")
     else:
         formatted = " ".join(w.capitalize() for w in raw.split())
         if Category.query.filter_by(name=formatted).first():
-            flash("Category already exists.")
+            flash("Category already exists.", "category_error")
         else:
             db.session.add(Category(name=formatted, emoji=emoji or None))
             db.session.commit()
@@ -161,6 +168,13 @@ def edit_expense(expense_id):
     description = request.form.get("description", "").strip()
     amount_raw = request.form.get("amount", "")
     expense_date_raw = request.form.get("expense_date", "")
+
+    if len(category) > 30:
+        flash("Category must be 30 characters or fewer.", "edit_expense_error")
+        return redirect(url_for("index", edit_error=expense_id))
+    if len(description) > 255:
+        flash("Description must be 255 characters or fewer.", "edit_expense_error")
+        return redirect(url_for("index", edit_error=expense_id))
 
     try:
         amount = float(amount_raw)
