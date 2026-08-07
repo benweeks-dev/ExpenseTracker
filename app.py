@@ -1,13 +1,20 @@
 import os
 from datetime import date, datetime
 
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
 from sqlalchemy import func, inspect, text
 
 from config import Config
 from models import Category, Expense, db
 
 NEW_CATEGORY_SENTINEL = "__new__"
+
+
+def validation_error(message, category, redirect_url):
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify(error=message), 400
+    flash(message, category)
+    return redirect(redirect_url)
 
 app = Flask(__name__, instance_relative_config=True)
 app.config.from_object(Config)
@@ -79,11 +86,9 @@ def add_expense():
     expense_date_raw = request.form.get("expense_date", "")
 
     if len(category) > 30:
-        flash("Category must be 30 characters or fewer.", "expense_error")
-        return redirect(url_for("index"))
+        return validation_error("Category must be 30 characters or fewer.", "expense_error", url_for("index"))
     if len(description) > 255:
-        flash("Description must be 255 characters or fewer.", "expense_error")
-        return redirect(url_for("index"))
+        return validation_error("Description must be 255 characters or fewer.", "expense_error", url_for("index"))
 
     try:
         amount = float(amount_raw)
@@ -115,21 +120,19 @@ def add_category():
     emoji = request.form.get("emoji", "").strip()
 
     if not raw:
-        flash("Category name is required.", "category_error")
-    elif len(raw) > 30:
-        flash("Category name must be 30 characters or fewer.", "category_error")
-    elif len(emoji) > 8:
-        flash("Emoji must be 8 characters or fewer.", "category_error")
-    else:
-        formatted = " ".join(w.capitalize() for w in raw.split())
-        if Category.query.filter_by(name=formatted).first():
-            flash("Category already exists.", "category_error")
-        else:
-            db.session.add(Category(name=formatted, emoji=emoji or None))
-            db.session.commit()
-            return redirect(url_for("index", new=formatted))
+        return validation_error("Category name is required.", "category_error", url_for("index"))
+    if len(raw) > 30:
+        return validation_error("Category name must be 30 characters or fewer.", "category_error", url_for("index"))
+    if len(emoji) > 8:
+        return validation_error("Emoji must be 8 characters or fewer.", "category_error", url_for("index"))
 
-    return redirect(url_for("index"))
+    formatted = " ".join(w.capitalize() for w in raw.split())
+    if Category.query.filter_by(name=formatted).first():
+        return validation_error("Category already exists.", "category_error", url_for("index"))
+
+    db.session.add(Category(name=formatted, emoji=emoji or None))
+    db.session.commit()
+    return redirect(url_for("index", new=formatted))
 
 
 @app.route("/categories/<int:category_id>/emoji", methods=["POST"])
@@ -170,11 +173,9 @@ def edit_expense(expense_id):
     expense_date_raw = request.form.get("expense_date", "")
 
     if len(category) > 30:
-        flash("Category must be 30 characters or fewer.", "edit_expense_error")
-        return redirect(url_for("index", edit_error=expense_id))
+        return validation_error("Category must be 30 characters or fewer.", "edit_expense_error", url_for("index", edit_error=expense_id))
     if len(description) > 255:
-        flash("Description must be 255 characters or fewer.", "edit_expense_error")
-        return redirect(url_for("index", edit_error=expense_id))
+        return validation_error("Description must be 255 characters or fewer.", "edit_expense_error", url_for("index", edit_error=expense_id))
 
     try:
         amount = float(amount_raw)

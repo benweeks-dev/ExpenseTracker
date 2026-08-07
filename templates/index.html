@@ -24,15 +24,17 @@
     <div class="modal" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryModalLabel" aria-hidden="true" data-show-modal="{{ 'true' if category_errors else 'false' }}">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" action="{{ url_for('add_category') }}">
+                <form method="POST" id="addCategoryForm" action="{{ url_for('add_category') }}">
                     <div class="modal-header">
                         <h5 class="modal-title" id="addCategoryModalLabel">Add Category</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="addCategoryErrors">
                         {% for message in category_errors %}
                         <div class="alert alert-danger">{{ message }}</div>
                         {% endfor %}
+                        </div>
                         <div class="d-flex gap-2">
                             <div style="width: 4.5rem;">
                                 <label class="form-label">Emoji</label>
@@ -87,9 +89,11 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="editExpenseErrors">
                         {% for message in edit_expense_errors %}
                         <div class="alert alert-danger">{{ message }}</div>
                         {% endfor %}
+                        </div>
                         <div class="row g-2 mb-2">
                             <div class="col-sm-6">
                                 <label class="form-label">Amount</label>
@@ -183,10 +187,12 @@
     <div class="col-lg-6">
     <div class="border rounded shadow-sm p-3 mb-4 panel">
         <h2 class="h5 fw-bold text-uppercase mb-3">Add Expense</h2>
+        <div id="addExpenseErrors">
         {% for message in expense_errors %}
         <div class="alert alert-danger">{{ message }}</div>
         {% endfor %}
-        <form method="POST" action="{{ url_for('add_expense') }}">
+        </div>
+        <form method="POST" id="addExpenseForm" action="{{ url_for('add_expense') }}">
             <div class="row g-2 mb-2">
                 <div class="col-sm-4">
                     <label class="form-label text-uppercase">Amount ($)</label>
@@ -247,11 +253,11 @@
         <div class="expenses-scroll">
         {% for e in expenses %}
         <div class="d-flex justify-content-between align-items-center border rounded shadow-sm p-3 mb-2 panel expense-row" data-category="{{ e.category }}" data-date="{{ e.expense_date.isoformat() }}" data-amount="{{ e.amount }}">
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3 overflow-hidden">
                 <div class="fs-3">{{ category_emojis.get(e.category) or '🏷️' }}</div>
-                <div>
+                <div class="overflow-hidden">
                     <div class="fw-semibold">{{ e.category }}</div>
-                    <div class="text-truncate">{{ e.description or "" }}</div>
+                    <div class="text-truncate" title="{{ e.description or '' }}">{{ e.description or "" }}</div>
                     <div class="text-muted small">{{ e.expense_date.strftime('%Y-%m-%d') }}</div>
                 </div>
             </div>
@@ -290,11 +296,13 @@
     const categorySelect = document.getElementById("category-select");
     const addCategoryModalEl = document.getElementById("addCategoryModal");
     const addCategoryModal = new bootstrap.Modal(addCategoryModalEl);
+    const addCategoryErrors = document.getElementById("addCategoryErrors");
     let lastValidCategory = categorySelect.value;
 
     categorySelect.addEventListener("change", () => {
         if (categorySelect.value === "__new__") {
             categorySelect.value = lastValidCategory;
+            addCategoryErrors.innerHTML = "";
             addCategoryModal.show();
         } else {
             lastValidCategory = categorySelect.value;
@@ -371,6 +379,7 @@
     const editExpenseModalEl = document.getElementById("editExpenseModal");
     const editExpenseModal = new bootstrap.Modal(editExpenseModalEl);
     const editExpenseForm = document.getElementById("editExpenseForm");
+    const editExpenseErrors = document.getElementById("editExpenseErrors");
     const editExpenseAmount = document.getElementById("editExpenseAmount");
     const editExpenseCategory = document.getElementById("editExpenseCategory");
     const editExpenseDate = document.getElementById("editExpenseDate");
@@ -386,6 +395,7 @@
 
     document.querySelectorAll(".edit-expense-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
+            editExpenseErrors.innerHTML = "";
             fillEditExpenseModal(btn);
             editExpenseModal.show();
         });
@@ -679,6 +689,37 @@
         }));
         spendingOverTimeChart.update();
     }
+
+    function interceptForm(form, errorContainer) {
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            errorContainer.innerHTML = "";
+
+            let response;
+            try {
+                response = await fetch(form.action, {
+                    method: "POST",
+                    headers: { "X-Requested-With": "XMLHttpRequest" },
+                    body: new FormData(form),
+                });
+            } catch (err) {
+                errorContainer.innerHTML = '<div class="alert alert-danger">Network error — please try again.</div>';
+                return;
+            }
+
+            if (response.ok) {
+                window.location.href = response.url;
+                return;
+            }
+
+            const data = await response.json().catch(() => ({}));
+            errorContainer.innerHTML = `<div class="alert alert-danger">${data.error || "Something went wrong."}</div>`;
+        });
+    }
+
+    interceptForm(document.getElementById("addExpenseForm"), document.getElementById("addExpenseErrors"));
+    interceptForm(editExpenseForm, editExpenseErrors);
+    interceptForm(document.getElementById("addCategoryForm"), document.getElementById("addCategoryErrors"));
 
     applyTheme(localStorage.getItem("theme") || "light");
     filterExpenses();
