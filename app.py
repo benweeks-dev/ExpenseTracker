@@ -1,26 +1,30 @@
 import os
-from datetime import date, datetime
 
-from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
-from sqlalchemy import func, inspect, text
+from flask import Flask
+from sqlalchemy import inspect, text
 
 from config import Config
-from models import Category, Expense, db
+from models import Category, db
 
-NEW_CATEGORY_SENTINEL = "__new__"
-
-
-def validation_error(message, category, redirect_url):
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return jsonify(error=message), 400
-    flash(message, category)
-    return redirect(redirect_url)
+from blueprints.categories import categories_bp
+from blueprints.dashboard import dashboard_bp
+from blueprints.expenses import expenses_bp
+from blueprints.graphs import graphs_bp
+from blueprints.income import income_bp
+from blueprints.transactions import transactions_bp
 
 app = Flask(__name__, instance_relative_config=True)
 app.config.from_object(Config)
 
 os.makedirs(app.instance_path, exist_ok=True)
 db.init_app(app)
+
+app.register_blueprint(dashboard_bp)
+app.register_blueprint(expenses_bp)
+app.register_blueprint(categories_bp)
+app.register_blueprint(transactions_bp)
+app.register_blueprint(graphs_bp)
+app.register_blueprint(income_bp)
 
 with app.app_context():
     db.create_all()
@@ -41,176 +45,6 @@ with app.app_context():
     if not Category.query.filter_by(name="Other").first():
         db.session.add(Category(name="Other"))
         db.session.commit()
-
-@app.route("/")
-def index():
-    expenses = Expense.query.order_by(Expense.expense_date.desc(), Expense.date_added.desc()).all()
-    categories = Category.query.order_by(Category.name).all()
-    total = sum(e.amount for e in expenses)
-
-    category_sums = dict(
-        db.session.query(Expense.category, func.sum(Expense.amount)).group_by(Expense.category).all()
-    )
-    category_totals = sorted(
-        (
-            {
-                "id": c.id,
-                "name": c.name,
-                "emoji": c.emoji,
-                "total": category_sums.get(c.name, 0.0),
-                "deletable": c.name not in category_sums,
-            }
-            for c in categories
-        ),
-        key=lambda c: c["total"],
-        reverse=True,
-    )
-    category_emojis = {c.name: c.emoji for c in categories}
-
-    return render_template(
-        "index.html",
-        expenses=expenses,
-        categories=categories,
-        category_totals=category_totals,
-        category_emojis=category_emojis,
-        total=total,
-        today=date.today(),
-    )
-
-
-@app.route("/add", methods=["POST"])
-def add_expense():
-    category = request.form.get("category", "").strip()
-    description = request.form.get("description", "").strip()
-    amount_raw = request.form.get("amount", "")
-    expense_date_raw = request.form.get("expense_date", "")
-
-    if len(category) > 30:
-        return validation_error("Category must be 30 characters or fewer.", "expense_error", url_for("index"))
-    if len(description) > 255:
-        return validation_error("Description must be 255 characters or fewer.", "expense_error", url_for("index"))
-
-    try:
-        amount = float(amount_raw)
-    except ValueError:
-        amount = None
-
-    try:
-        expense_date = datetime.strptime(expense_date_raw, "%Y-%m-%d").date()
-    except ValueError:
-        expense_date = None
-
-    if (
-        category
-        and category != NEW_CATEGORY_SENTINEL
-        and amount is not None
-        and amount > 0
-        and expense_date is not None
-    ):
-        expense = Expense(amount=amount, category=category, description=description or None, expense_date=expense_date)
-        db.session.add(expense)
-        db.session.commit()
-
-    return redirect(url_for("index"))
-
-
-@app.route("/categories/add", methods=["POST"])
-def add_category():
-    raw = request.form.get("name", "").strip()
-    emoji = request.form.get("emoji", "").strip()
-
-    if not raw:
-        return validation_error("Category name is required.", "category_error", url_for("index"))
-    if len(raw) > 30:
-        return validation_error("Category name must be 30 characters or fewer.", "category_error", url_for("index"))
-    if len(emoji) > 8:
-        return validation_error("Emoji must be 8 characters or fewer.", "category_error", url_for("index"))
-
-    formatted = " ".join(w.capitalize() for w in raw.split())
-    if Category.query.filter_by(name=formatted).first():
-        return validation_error("Category already exists.", "category_error", url_for("index"))
-
-    db.session.add(Category(name=formatted, emoji=emoji or None))
-    db.session.commit()
-    return redirect(url_for("index", new=formatted))
-
-
-@app.route("/categories/<int:category_id>/emoji", methods=["POST"])
-def update_category_emoji(category_id):
-    category = db.session.get(Category, category_id)
-    if category:
-        emoji = request.form.get("emoji", "").strip()
-        if len(emoji) <= 8:
-            category.emoji = emoji or None
-            db.session.commit()
-
-    return redirect(url_for("index"))
-
-
-@app.route("/categories/<int:category_id>/delete", methods=["POST"])
-def delete_category(category_id):
-    category = db.session.get(Category, category_id)
-    if category:
-        has_expenses = Expense.query.filter_by(category=category.name).first() is not None
-        if has_expenses:
-            flash("Cannot delete a category that has expenses.", "category_delete")
-        else:
-            db.session.delete(category)
-            db.session.commit()
-
-    return redirect(url_for("index"))
-
-
-@app.route("/expenses/<int:expense_id>/edit", methods=["POST"])
-def edit_expense(expense_id):
-    expense = db.session.get(Expense, expense_id)
-    if not expense:
-        return redirect(url_for("index"))
-
-    category = request.form.get("category", "").strip()
-    description = request.form.get("description", "").strip()
-    amount_raw = request.form.get("amount", "")
-    expense_date_raw = request.form.get("expense_date", "")
-
-    if len(category) > 30:
-        return validation_error("Category must be 30 characters or fewer.", "edit_expense_error", url_for("index", edit_error=expense_id))
-    if len(description) > 255:
-        return validation_error("Description must be 255 characters or fewer.", "edit_expense_error", url_for("index", edit_error=expense_id))
-
-    try:
-        amount = float(amount_raw)
-    except ValueError:
-        amount = None
-
-    try:
-        expense_date = datetime.strptime(expense_date_raw, "%Y-%m-%d").date()
-    except ValueError:
-        expense_date = None
-
-    if (
-        category
-        and category != NEW_CATEGORY_SENTINEL
-        and amount is not None
-        and amount > 0
-        and expense_date is not None
-    ):
-        expense.amount = amount
-        expense.category = category
-        expense.description = description or None
-        expense.expense_date = expense_date
-        db.session.commit()
-
-    return redirect(url_for("index"))
-
-
-@app.route("/delete/<int:expense_id>", methods=["POST"])
-def delete_expense(expense_id):
-    expense = db.session.get(Expense, expense_id)
-    if expense:
-        db.session.delete(expense)
-        db.session.commit()
-
-    return redirect(url_for("index"))
 
 
 if __name__ == "__main__":
