@@ -10,8 +10,10 @@
     {% set recurring_errors = get_flashed_messages(category_filter=["recurring_error"]) %}
     {% set edit_recurring_errors = get_flashed_messages(category_filter=["edit_recurring_error"]) %}
 
-    <div class="d-flex justify-content-between align-items-center mb-4 border rounded shadow-sm p-3 panel">
-        <div class="alert alert-primary fs-4 mb-0">Total Income: ${{ "%.2f"|format(total) }}</div>
+    <div class="d-flex justify-content-between align-items-center gap-3 mb-4 border rounded shadow-sm p-3 panel flex-wrap">
+        <div class="alert alert-primary fs-4 mb-0" id="incomeTotal">Total Income: ${{ "%.2f"|format(total) }}</div>
+        <div class="text-muted flex-grow-1 text-truncate" id="incomeFilterDescription">All income</div>
+        <button type="button" id="clearAllIncomeFilters" class="btn btn-outline-secondary" disabled>Clear All</button>
     </div>
 
     <div class="modal" id="addIncomeCategoryModal" tabindex="-1" aria-labelledby="addIncomeCategoryModalLabel" aria-hidden="true" data-show-modal="{{ 'true' if category_errors else 'false' }}">
@@ -196,6 +198,7 @@
     <div class="border rounded shadow-sm p-3 mb-4 panel">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2 class="h5 fw-bold text-uppercase mb-0">Income Categories</h2>
+            <button type="button" id="clearIncomeCategorySelection" class="btn btn-outline-secondary btn-sm" disabled>Clear Selection</button>
         </div>
         {% for message in category_delete_errors %}
         <div class="alert alert-danger">{{ message }}</div>
@@ -279,6 +282,9 @@
             <div class="d-flex justify-content-between align-items-start gap-2">
                 <div class="overflow-hidden">
                     <div class="fw-semibold text-truncate">{{ category_emojis.get(rule.category) or '🏷️' }} {{ rule.category }} &mdash; ${{ "%.2f"|format(rule.amount) }}</div>
+                    {% if rule.description %}
+                    <div class="text-truncate" title="{{ rule.description }}">{{ rule.description }}</div>
+                    {% endif %}
                     <div class="text-muted small">{{ rule.frequency|capitalize }} since {{ rule.start_date.isoformat() }}{% if rule.end_date %} until {{ rule.end_date.isoformat() }}{% endif %}</div>
                     {% if not rule.active %}
                     <span class="badge text-bg-secondary">Paused</span>
@@ -326,10 +332,33 @@
 
     <div class="col-lg-6">
     <div class="border rounded shadow-sm p-3 panel">
-        <h2 class="h5 fw-bold text-uppercase mb-3">Income Entries</h2>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h5 fw-bold text-uppercase mb-0">Income Entries</h2>
+            <button type="button" id="clearIncomeFilters" class="btn btn-outline-secondary btn-sm" disabled>Clear Filters</button>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-6 col-sm-3">
+                <label class="form-label text-uppercase small">Month</label>
+                <select id="incomeMonthFilter" class="form-select form-select-sm">
+                    <option value="">All Months</option>
+                </select>
+            </div>
+            <div class="col-6 col-sm-3">
+                <label class="form-label text-uppercase small">From</label>
+                <input type="date" id="incomeDateFromFilter" class="form-control form-control-sm">
+            </div>
+            <div class="col-6 col-sm-3">
+                <label class="form-label text-uppercase small">To</label>
+                <input type="date" id="incomeDateToFilter" class="form-control form-control-sm">
+            </div>
+            <div class="col-6 col-sm-3">
+                <label class="form-label text-uppercase small">Min Amount ($)</label>
+                <input type="number" step="0.01" min="0" id="incomeMinAmountFilter" class="form-control form-control-sm" placeholder="0.00">
+            </div>
+        </div>
         <div class="income-scroll">
         {% for i in income_entries %}
-        <div class="d-flex justify-content-between align-items-center border rounded shadow-sm p-3 mb-2 panel">
+        <div class="d-flex justify-content-between align-items-center border rounded shadow-sm p-3 mb-2 panel income-row" data-category="{{ i.category }}" data-date="{{ i.income_date.isoformat() }}" data-amount="{{ i.amount }}">
             <div class="d-flex align-items-center gap-3 overflow-hidden">
                 <div class="fs-3">{{ category_emojis.get(i.category) or '🏷️' }}</div>
                 <div class="overflow-hidden">
@@ -359,6 +388,7 @@
         {% else %}
         <div class="text-center text-muted p-4">No income yet</div>
         {% endfor %}
+        <div id="noFilteredIncome" class="text-center text-muted p-4 d-none">No income matches the selected filters</div>
         </div>
     </div>
     </div>

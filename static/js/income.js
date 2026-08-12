@@ -169,3 +169,167 @@ interceptForm(document.getElementById("addIncomeForm"), document.getElementById(
 interceptForm(editIncomeForm, editIncomeErrors);
 interceptForm(document.getElementById("addIncomeCategoryForm"), addIncomeCategoryErrors);
 interceptForm(recurringForm, recurringErrors);
+
+const selectedCategories = new Set();
+const incomeRows = document.querySelectorAll(".income-row");
+const noFilteredIncome = document.getElementById("noFilteredIncome");
+const categoryCards = document.querySelectorAll(".category-card");
+const clearIncomeCategorySelection = document.getElementById("clearIncomeCategorySelection");
+const incomeMonthFilter = document.getElementById("incomeMonthFilter");
+const incomeDateFromFilter = document.getElementById("incomeDateFromFilter");
+const incomeDateToFilter = document.getElementById("incomeDateToFilter");
+const incomeMinAmountFilter = document.getElementById("incomeMinAmountFilter");
+const clearIncomeFilters = document.getElementById("clearIncomeFilters");
+const incomeTotal = document.getElementById("incomeTotal");
+const incomeFilterDescription = document.getElementById("incomeFilterDescription");
+const clearAllIncomeFilters = document.getElementById("clearAllIncomeFilters");
+
+const INCOME_MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+const incomeMonths = new Set();
+incomeRows.forEach((row) => incomeMonths.add(row.dataset.date.slice(0, 7)));
+Array.from(incomeMonths).sort().reverse().forEach((month) => {
+    const [year, monthNum] = month.split("-");
+    const option = document.createElement("option");
+    option.value = month;
+    option.textContent = `${INCOME_MONTH_NAMES[parseInt(monthNum, 10) - 1]} ${year}`;
+    incomeMonthFilter.appendChild(option);
+});
+
+function formatIncomeDateDisplay(dateStr) {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    return `${INCOME_MONTH_NAMES[month - 1].slice(0, 3)} ${day}, ${year}`;
+}
+
+function buildIncomeFilterDescription(month, dateFrom, dateTo, minAmount) {
+    const parts = [];
+
+    if (selectedCategories.size > 0) {
+        parts.push(Array.from(selectedCategories).join(", "));
+    }
+
+    if (month) {
+        parts.push(incomeMonthFilter.options[incomeMonthFilter.selectedIndex].textContent);
+    } else if (dateFrom || dateTo) {
+        if (dateFrom && dateTo) {
+            parts.push(`${formatIncomeDateDisplay(dateFrom)} – ${formatIncomeDateDisplay(dateTo)}`);
+        } else if (dateFrom) {
+            parts.push(`From ${formatIncomeDateDisplay(dateFrom)}`);
+        } else {
+            parts.push(`Through ${formatIncomeDateDisplay(dateTo)}`);
+        }
+    }
+
+    if (!isNaN(minAmount)) {
+        parts.push(`≥ $${minAmount.toFixed(2)}`);
+    }
+
+    return parts.length > 0 ? parts.join(" · ") : "All income";
+}
+
+function filterIncome() {
+    const month = incomeMonthFilter.value;
+    const dateFrom = incomeDateFromFilter.value;
+    const dateTo = incomeDateToFilter.value;
+    const minAmount = parseFloat(incomeMinAmountFilter.value);
+
+    let visibleCount = 0;
+    let visibleTotal = 0;
+    incomeRows.forEach((row) => {
+        const categoryMatch = selectedCategories.size === 0 || selectedCategories.has(row.dataset.category);
+
+        let dateMatch = true;
+        if (month) {
+            dateMatch = row.dataset.date.startsWith(month);
+        } else if (dateFrom || dateTo) {
+            dateMatch = (!dateFrom || row.dataset.date >= dateFrom) && (!dateTo || row.dataset.date <= dateTo);
+        }
+
+        const amountMatch = isNaN(minAmount) || parseFloat(row.dataset.amount) >= minAmount;
+
+        const show = categoryMatch && dateMatch && amountMatch;
+        row.classList.toggle("d-none", !show);
+        if (show) {
+            visibleCount++;
+            visibleTotal += parseFloat(row.dataset.amount);
+        }
+    });
+    noFilteredIncome.classList.toggle("d-none", visibleCount !== 0 || incomeRows.length === 0);
+
+    incomeTotal.textContent = "Total Income: $" + visibleTotal.toFixed(2);
+    incomeFilterDescription.textContent = buildIncomeFilterDescription(month, dateFrom, dateTo, minAmount);
+
+    const hasSelection = selectedCategories.size > 0;
+    clearIncomeCategorySelection.disabled = !hasSelection;
+    clearIncomeCategorySelection.classList.toggle("btn-secondary", hasSelection);
+    clearIncomeCategorySelection.classList.toggle("btn-outline-secondary", !hasSelection);
+
+    const hasIncomeFilters = Boolean(month || dateFrom || dateTo || incomeMinAmountFilter.value);
+    clearIncomeFilters.disabled = !hasIncomeFilters;
+    clearIncomeFilters.classList.toggle("btn-secondary", hasIncomeFilters);
+    clearIncomeFilters.classList.toggle("btn-outline-secondary", !hasIncomeFilters);
+
+    const hasAnyFilters = hasSelection || hasIncomeFilters;
+    clearAllIncomeFilters.disabled = !hasAnyFilters;
+    clearAllIncomeFilters.classList.toggle("btn-secondary", hasAnyFilters);
+    clearAllIncomeFilters.classList.toggle("btn-outline-secondary", !hasAnyFilters);
+}
+
+categoryCards.forEach((card) => {
+    card.addEventListener("click", (event) => {
+        if (event.target.closest(".edit-emoji-btn, form")) return;
+
+        const category = card.dataset.category;
+        if (selectedCategories.has(category)) {
+            selectedCategories.delete(category);
+            card.classList.remove("category-selected");
+        } else {
+            selectedCategories.add(category);
+            card.classList.add("category-selected");
+        }
+        filterIncome();
+    });
+});
+
+clearIncomeCategorySelection.addEventListener("click", () => {
+    selectedCategories.clear();
+    categoryCards.forEach((card) => card.classList.remove("category-selected"));
+    filterIncome();
+});
+
+incomeMonthFilter.addEventListener("change", () => {
+    if (incomeMonthFilter.value) {
+        incomeDateFromFilter.value = "";
+        incomeDateToFilter.value = "";
+    }
+    filterIncome();
+});
+
+[incomeDateFromFilter, incomeDateToFilter].forEach((input) => {
+    input.addEventListener("input", () => {
+        incomeMonthFilter.value = "";
+        filterIncome();
+    });
+});
+
+incomeMinAmountFilter.addEventListener("input", filterIncome);
+
+clearIncomeFilters.addEventListener("click", () => {
+    incomeMonthFilter.value = "";
+    incomeDateFromFilter.value = "";
+    incomeDateToFilter.value = "";
+    incomeMinAmountFilter.value = "";
+    filterIncome();
+});
+
+clearAllIncomeFilters.addEventListener("click", () => {
+    selectedCategories.clear();
+    categoryCards.forEach((card) => card.classList.remove("category-selected"));
+    incomeMonthFilter.value = "";
+    incomeDateFromFilter.value = "";
+    incomeDateToFilter.value = "";
+    incomeMinAmountFilter.value = "";
+    filterIncome();
+});
+
+filterIncome();
