@@ -100,6 +100,9 @@ const dateFromFilter = document.getElementById("dateFromFilter");
 const dateToFilter = document.getElementById("dateToFilter");
 const minAmountFilter = document.getElementById("minAmountFilter");
 const clearExpenseFilters = document.getElementById("clearExpenseFilters");
+const dashboardTotal = document.getElementById("dashboardTotal");
+const filterDescription = document.getElementById("filterDescription");
+const clearAllFilters = document.getElementById("clearAllFilters");
 
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -113,6 +116,37 @@ Array.from(months).sort().reverse().forEach((month) => {
     monthFilter.appendChild(option);
 });
 
+function formatDateDisplay(dateStr) {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    return `${MONTH_NAMES[month - 1].slice(0, 3)} ${day}, ${year}`;
+}
+
+function buildFilterDescription(month, dateFrom, dateTo, minAmount) {
+    const parts = [];
+
+    if (selectedCategories.size > 0) {
+        parts.push(Array.from(selectedCategories).join(", "));
+    }
+
+    if (month) {
+        parts.push(monthFilter.options[monthFilter.selectedIndex].textContent);
+    } else if (dateFrom || dateTo) {
+        if (dateFrom && dateTo) {
+            parts.push(`${formatDateDisplay(dateFrom)} – ${formatDateDisplay(dateTo)}`);
+        } else if (dateFrom) {
+            parts.push(`From ${formatDateDisplay(dateFrom)}`);
+        } else {
+            parts.push(`Through ${formatDateDisplay(dateTo)}`);
+        }
+    }
+
+    if (!isNaN(minAmount)) {
+        parts.push(`≥ $${minAmount.toFixed(2)}`);
+    }
+
+    return parts.length > 0 ? parts.join(" · ") : "All expenses";
+}
+
 function filterExpenses() {
     const month = monthFilter.value;
     const dateFrom = dateFromFilter.value;
@@ -120,6 +154,7 @@ function filterExpenses() {
     const minAmount = parseFloat(minAmountFilter.value);
 
     let visibleCount = 0;
+    let visibleTotal = 0;
     expenseRows.forEach((row) => {
         const categoryMatch = selectedCategories.size === 0 || selectedCategories.has(row.dataset.category);
 
@@ -134,9 +169,15 @@ function filterExpenses() {
 
         const show = categoryMatch && dateMatch && amountMatch;
         row.classList.toggle("d-none", !show);
-        if (show) visibleCount++;
+        if (show) {
+            visibleCount++;
+            visibleTotal += parseFloat(row.dataset.amount);
+        }
     });
     noFilteredExpenses.classList.toggle("d-none", visibleCount !== 0 || expenseRows.length === 0);
+
+    dashboardTotal.textContent = "Total: $" + visibleTotal.toFixed(2);
+    filterDescription.textContent = buildFilterDescription(month, dateFrom, dateTo, minAmount);
 
     const hasSelection = selectedCategories.size > 0;
     clearCategorySelection.disabled = !hasSelection;
@@ -147,6 +188,11 @@ function filterExpenses() {
     clearExpenseFilters.disabled = !hasExpenseFilters;
     clearExpenseFilters.classList.toggle("btn-secondary", hasExpenseFilters);
     clearExpenseFilters.classList.toggle("btn-outline-secondary", !hasExpenseFilters);
+
+    const hasAnyFilters = hasSelection || hasExpenseFilters;
+    clearAllFilters.disabled = !hasAnyFilters;
+    clearAllFilters.classList.toggle("btn-secondary", hasAnyFilters);
+    clearAllFilters.classList.toggle("btn-outline-secondary", !hasAnyFilters);
 
     updateCharts();
 }
@@ -191,6 +237,16 @@ monthFilter.addEventListener("change", () => {
 minAmountFilter.addEventListener("input", filterExpenses);
 
 clearExpenseFilters.addEventListener("click", () => {
+    monthFilter.value = "";
+    dateFromFilter.value = "";
+    dateToFilter.value = "";
+    minAmountFilter.value = "";
+    filterExpenses();
+});
+
+clearAllFilters.addEventListener("click", () => {
+    selectedCategories.clear();
+    categoryCards.forEach((card) => card.classList.remove("category-selected"));
     monthFilter.value = "";
     dateFromFilter.value = "";
     dateToFilter.value = "";
