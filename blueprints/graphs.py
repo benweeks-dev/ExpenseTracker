@@ -13,7 +13,7 @@ def index():
     # Sorted by total desc, same order dashboard.html renders its category
     # cards in, so per-category chart colors (assigned by DOM order) match
     # between the Dashboard and this page.
-    category_totals = get_category_totals(categories)
+    category_totals = get_category_totals(categories, Expense)
     expenses_json = [
         {"category": e.category, "amount": e.amount, "date": e.expense_date.isoformat()}
         for e in expenses

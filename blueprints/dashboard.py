@@ -14,7 +14,7 @@ def index():
     categories = Category.query.order_by(Category.name).all()
     total = sum(e.amount for e in expenses)
 
-    category_totals = get_category_totals(categories)
+    category_totals = get_category_totals(categories, Expense)
     category_emojis = {c.name: c.emoji for c in categories}
 
     return render_template(

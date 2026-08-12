@@ -104,7 +104,8 @@
 [data-bs-theme="dark"] .edit-emoji-btn:hover {
     background-color: rgba(255, 255, 255, 0.18);
 }
-.expenses-scroll {
+.expenses-scroll,
+.income-scroll {
     max-height: 32rem;
     overflow-y: auto;
     padding-right: 0.5rem;

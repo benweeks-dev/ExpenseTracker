@@ -421,33 +421,6 @@ function updateCharts() {
     spendingOverTimeChart.update();
 }
 
-function interceptForm(form, errorContainer) {
-    form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        errorContainer.innerHTML = "";
-
-        let response;
-        try {
-            response = await fetch(form.action, {
-                method: "POST",
-                headers: { "X-Requested-With": "XMLHttpRequest" },
-                body: new FormData(form),
-            });
-        } catch (err) {
-            errorContainer.innerHTML = '<div class="alert alert-danger">Network error — please try again.</div>';
-            return;
-        }
-
-        if (response.ok) {
-            window.location.href = response.url;
-            return;
-        }
-
-        const data = await response.json().catch(() => ({}));
-        errorContainer.innerHTML = `<div class="alert alert-danger">${data.error || "Something went wrong."}</div>`;
-    });
-}
-
 interceptForm(document.getElementById("addExpenseForm"), document.getElementById("addExpenseErrors"));
 interceptForm(editExpenseForm, editExpenseErrors);
 interceptForm(document.getElementById("addCategoryForm"), document.getElementById("addCategoryErrors"));

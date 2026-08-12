@@ -1,7 +1,7 @@
 from flask import flash, jsonify, redirect, request
 from sqlalchemy import func
 
-from models import Expense, db
+from models import db
 
 
 def validation_error(message, category, redirect_url):
@@ -11,9 +11,9 @@ def validation_error(message, category, redirect_url):
     return redirect(redirect_url)
 
 
-def get_category_totals(categories):
+def get_category_totals(categories, model):
     category_sums = dict(
-        db.session.query(Expense.category, func.sum(Expense.amount)).group_by(Expense.category).all()
+        db.session.query(model.category, func.sum(model.amount)).group_by(model.category).all()
     )
     return sorted(
         (
