@@ -3,8 +3,102 @@
 {% block title %}Graphs - Expense Tracker{% endblock %}
 
 {% block content %}
-    <div class="border rounded shadow-sm p-3 panel">
-        <h2 class="h5 fw-bold text-uppercase mb-3">Graphs</h2>
-        <p class="text-muted mb-0">Coming soon.</p>
+    <div class="border rounded shadow-sm p-3 mb-4 panel">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h5 fw-bold text-uppercase mb-0">Filter</h2>
+            <button type="button" id="graphClearAll" class="btn btn-outline-secondary btn-sm" disabled>Clear All</button>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mb-3" id="graphCategoryChips">
+            {% for c in category_totals %}
+            <button type="button" class="btn btn-outline-secondary btn-sm category-chip" data-category="{{ c.name }}">{{ (c.emoji + ' ') if c.emoji else '' }}{{ c.name }}</button>
+            {% endfor %}
+        </div>
+        <div class="row g-2">
+            <div class="col-6 col-sm-3">
+                <label class="form-label text-uppercase small">Month</label>
+                <select id="graphMonthFilter" class="form-select form-select-sm">
+                    <option value="">All Months</option>
+                </select>
+            </div>
+            <div class="col-6 col-sm-3">
+                <label class="form-label text-uppercase small">From</label>
+                <input type="date" id="graphDateFromFilter" class="form-control form-control-sm">
+            </div>
+            <div class="col-6 col-sm-3">
+                <label class="form-label text-uppercase small">To</label>
+                <input type="date" id="graphDateToFilter" class="form-control form-control-sm">
+            </div>
+            <div class="col-6 col-sm-3">
+                <label class="form-label text-uppercase small">Min Amount ($)</label>
+                <input type="number" step="0.01" min="0" id="graphMinAmountFilter" class="form-control form-control-sm" placeholder="0.00">
+            </div>
+        </div>
     </div>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="row g-4 mb-4">
+                <div class="col-xl-6">
+                    <div class="border rounded shadow-sm p-3 panel">
+                        <div class="chart-container-lg">
+                            <canvas id="graphCategoryBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-6">
+                    <div class="border rounded shadow-sm p-3 panel">
+                        <div class="chart-container-lg">
+                            <canvas id="graphCategoryPieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="border rounded shadow-sm p-3 panel">
+                <div class="chart-container-lg">
+                    <canvas id="graphSpendingOverTimeChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="border rounded shadow-sm p-3 mb-4 panel">
+                <div class="chart-container-lg">
+                    <canvas id="categoryTrendsChart"></canvas>
+                </div>
+            </div>
+            <div class="row g-4">
+                <div class="col-xl-6">
+                    <div class="border rounded shadow-sm p-3 panel">
+                        <div class="chart-container-lg">
+                            <canvas id="monthOverMonthChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-6">
+                    <div class="border rounded shadow-sm p-3 panel">
+                        <h2 class="h5 fw-bold text-uppercase mb-3">Top Categories</h2>
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Category</th>
+                                    <th class="text-end">Total</th>
+                                    <th class="text-end">%</th>
+                                </tr>
+                            </thead>
+                            <tbody id="topCategoriesBody"></tbody>
+                        </table>
+                        <div id="noTopCategories" class="text-center text-muted p-4 d-none">No expenses match the selected filters</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="application/json" id="expenseData">{{ expenses_json | tojson }}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/graphs.js') }}"></script>
 {% endblock %}

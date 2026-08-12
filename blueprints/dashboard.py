@@ -1,9 +1,9 @@
 from datetime import date
 
 from flask import Blueprint, render_template
-from sqlalchemy import func
 
-from models import Category, Expense, db
+from blueprints.helpers import get_category_totals
+from models import Category, Expense
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -14,23 +14,7 @@ def index():
     categories = Category.query.order_by(Category.name).all()
     total = sum(e.amount for e in expenses)
 
-    category_sums = dict(
-        db.session.query(Expense.category, func.sum(Expense.amount)).group_by(Expense.category).all()
-    )
-    category_totals = sorted(
-        (
-            {
-                "id": c.id,
-                "name": c.name,
-                "emoji": c.emoji,
-                "total": category_sums.get(c.name, 0.0),
-                "deletable": c.name not in category_sums,
-            }
-            for c in categories
-        ),
-        key=lambda c: c["total"],
-        reverse=True,
-    )
+    category_totals = get_category_totals(categories)
     category_emojis = {c.name: c.emoji for c in categories}
 
     return render_template(
