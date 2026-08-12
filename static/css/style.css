@@ -3,6 +3,9 @@
     min-width: 220px;
     transition: width 0.15s ease, min-width 0.15s ease;
 }
+.content {
+    min-width: 0;
+}
 .sidebar .nav-icon {
     display: inline-block;
     width: 1.5rem;
