@@ -107,6 +107,7 @@
 .expenses-scroll,
 .income-scroll {
     max-height: 32rem;
+    min-height: 32rem;
     overflow-y: auto;
     padding-right: 0.5rem;
 }

@@ -75,3 +75,17 @@ sidebarToggle.addEventListener("click", () => {
         bootstrap.Offcanvas.getOrCreateInstance(sidebarEl).toggle();
     }
 });
+
+function sizeFillScrollBoxes() {
+    document.querySelectorAll(".income-scroll, .expenses-scroll").forEach((el) => {
+        if (!desktopQuery.matches) {
+            el.style.maxHeight = "";
+            return;
+        }
+        const available = window.innerHeight - el.getBoundingClientRect().top - 50;
+        el.style.maxHeight = Math.max(200, available) + "px";
+    });
+}
+
+window.addEventListener("resize", sizeFillScrollBoxes);
+document.addEventListener("DOMContentLoaded", sizeFillScrollBoxes);
